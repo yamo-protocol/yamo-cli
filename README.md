@@ -8,15 +8,35 @@ The YAMO CLI provides developer tools for creating, hashing, submitting, and aud
 
 ## Installation
 
+### From GitHub (Current Method)
+
+```bash
+# Clone the repository
+git clone https://github.com/yamo-protocol/yamo-cli.git
+cd yamo-cli
+
+# Install dependencies
+npm install
+
+# Build
+npm run build
+
+# Link globally (optional)
+npm link
+
+# Verify installation
+yamo --help
+```
+
+### From NPM (Coming Soon)
+
+Once published to npm, you'll be able to install with:
+
 ```bash
 npm install -g @yamo/cli
 ```
 
-Or use locally:
-
-```bash
-npm install @yamo/cli
-```
+_Note: The package is not yet published to npm. Please use the GitHub installation method above._
 
 ## Commands
 

@@ -48,6 +48,44 @@ npm install -g @yamo/cli
 
 _Note: The package is not yet published to npm. Please use the GitHub installation method above._
 
+## Configuration
+
+**Important:** Before using `submit` or `audit` commands, create a `.env` file in the yamo-cli directory:
+
+```bash
+cd yamo-cli
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+Or create it manually:
+
+```bash
+cat > .env << 'EOF'
+RPC_URL=http://127.0.0.1:8545
+PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+CONTRACT_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+PINATA_JWT=
+EOF
+```
+
+**Environment Variables:**
+
+- `RPC_URL` - Blockchain RPC endpoint (required for `submit` and `audit`)
+- `PRIVATE_KEY` - Wallet private key for signing transactions (required for `submit`)
+- `CONTRACT_ADDRESS` - Deployed YAMORegistry contract address (required for `submit` and `audit`)
+- `PINATA_JWT` - Pinata API token for IPFS uploads (optional - uses mock if not set)
+
+**Note:** The private key shown above is from Hardhat's test accounts (safe for local development only). Never use it on mainnet or testnets with real funds.
+
+**Commands that work without .env:**
+- `yamo init` - ✅ No configuration needed
+- `yamo hash` - ✅ No configuration needed
+
+**Commands that require .env:**
+- `yamo submit` - ❌ Requires RPC_URL, PRIVATE_KEY, CONTRACT_ADDRESS
+- `yamo audit` - ❌ Requires RPC_URL, CONTRACT_ADDRESS
+
 ## Commands
 
 ### `yamo init <agentName>`

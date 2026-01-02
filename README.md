@@ -20,12 +20,22 @@ npm install
 
 # Build
 npm run build
+```
 
-# Link globally (optional)
-npm link
+**Option A: Use locally without global install**
 
-# Verify installation
+```bash
+npm start -- --help
+npm start -- init MyAgent
+npm start -- hash myfile.yamo
+```
+
+**Option B: Install globally**
+
+```bash
+sudo npm link
 yamo --help
+yamo init MyAgent
 ```
 
 ### From NPM (Coming Soon)

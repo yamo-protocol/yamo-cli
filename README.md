@@ -1,144 +1,63 @@
-# @yamo/cli
+# 💻 YAMO CLI (v1.0.0 - Protocol v0.4)
 
-Command-line interface for the YAMO Protocol.
+The Command Line Interface for the YAMO Protocol. Now powered by `@yamo/core`.
 
-## Overview
+## 📥 Installation
 
-The YAMO CLI provides developer tools for creating, hashing, submitting, and auditing YAMO blocks on EVM-compatible blockchains with IPFS integration.
-
-## Installation
-
-### From GitHub (Current Method)
-
+From the monorepo root:
 ```bash
-# Clone the repository
-git clone https://github.com/yamo-protocol/yamo-cli.git
-cd yamo-cli
-
-# Install dependencies
 npm install
-
-# Build
-npm run build
+npm run build --workspaces
 ```
 
-**Option A: Use locally without global install**
+## ⚙️ Configuration (.env)
+Create a `.env` file in `packages/cli`:
 
 ```bash
-npm start -- --help
-npm start -- init MyAgent
-npm start -- hash myfile.yamo
-```
-
-**Option B: Install globally**
-
-```bash
-sudo npm link
-yamo --help
-yamo init MyAgent
-```
-
-### From NPM (Coming Soon)
-
-Once published to npm, you'll be able to install with:
-
-```bash
-npm install -g @yamo/cli
-```
-
-_Note: The package is not yet published to npm. Please use the GitHub installation method above._
-
-## Configuration
-
-**Important:** Before using `submit` or `audit` commands, create a `.env` file in the yamo-cli directory:
-
-```bash
-cd yamo-cli
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-Or create it manually:
-
-```bash
-cat > .env << 'EOF'
+CONTRACT_ADDRESS=0xe7f1...
 RPC_URL=http://127.0.0.1:8545
-PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-CONTRACT_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-PINATA_JWT=
-EOF
+PRIVATE_KEY=0x...
+
+# IPFS Settings
+USE_REAL_IPFS=true
+PINATA_JWT=eyJ...
 ```
 
-**Environment Variables:**
+## 📖 Commands
 
-- `RPC_URL` - Blockchain RPC endpoint (required for `submit` and `audit`)
-- `PRIVATE_KEY` - Wallet private key for signing transactions (required for `submit`)
-- `CONTRACT_ADDRESS` - Deployed YAMORegistry contract address (required for `submit` and `audit`)
-- `PINATA_JWT` - Pinata API token for IPFS uploads (optional - uses mock if not set)
-
-**Note:** The private key shown above is from Hardhat's test accounts (safe for local development only). Never use it on mainnet or testnets with real funds.
-
-**Commands that work without .env:**
-- `yamo init` - ✅ No configuration needed
-- `yamo hash` - ✅ No configuration needed
-
-**Commands that require .env:**
-- `yamo submit` - ❌ Requires RPC_URL, PRIVATE_KEY, CONTRACT_ADDRESS
-- `yamo audit` - ❌ Requires RPC_URL, CONTRACT_ADDRESS
-
-## Commands
-
-### `yamo init <agentName>`
-
-Initialize a new YAMO block file.
-
-```bash
-yamo init MyAgent
-```
-
-Creates a new `.yamo` file with the basic structure.
+### `yamo init <agent_name>`
+Creates a new `block.yamo` template.
 
 ### `yamo hash <file>`
-
-Calculate the SHA256 hash of a YAMO file.
-
-```bash
-yamo hash my-block.yamo
-```
-
-Returns the content hash that will be stored on-chain for verification.
+Calculates the content hash formatted for blockchain submission.
 
 ### `yamo submit <file>`
-
-Submit a YAMO block to the blockchain with IPFS anchoring.
-
-```bash
-yamo submit my-block.yamo
-```
-
-This command uploads content to IPFS, calculates the hash, and submits to the blockchain.
+Submits a block to the chain.
+*   `--ipfs`: Uploads content to IPFS. If the YAMO file contains `output: file.json;`, it will automatically create a **Deep Bundle** containing both the trace and the artifact.
+*   `-e, --encrypt`: Encrypts the IPFS bundle using AES-256-GCM.
+*   `-k, --key <string>`: The passphrase for encryption (or use `YAMO_ENCRYPTION_KEY` env var).
 
 ### `yamo audit <blockId>`
+Performs a cryptographic integrity check.
+1.  Fetches block data from the chain.
+2.  Downloads content from IPFS.
+3.  Re-hashes the content locally.
+4.  Asserts `LocalHash === ChainHash`.
 
-Verify the integrity of a YAMO block.
+*   `-k, --key <string>`: Passphrase to decrypt the content if the bundle is encrypted.
 
+## 🔒 Encryption
+
+YAMO v1.0 supports optional client-side encryption for IPFS bundles.
+- **Algorithm**: AES-256-GCM (Authenticated Encryption).
+- **Key Derivation**: Keys are derived from your passphrase using `scrypt` with a random salt.
+- **Metadata**: Encrypted bundles include an `encryption_metadata.json` file with the salt and IVs. The actual content is opaque.
+
+**Example Encrypted Workflow:**
 ```bash
-yamo audit block_001
+# Submit
+yamo submit task.yamo --id 123 --ipfs --encrypt --key "my-secret"
+
+# Audit
+yamo audit 123 --key "my-secret"
 ```
-
-Fetches the block from the blockchain and verifies integrity.
-
-## Configuration
-
-Create a `.env` file or set environment variables:
-
-```env
-RPC_URL=http://127.0.0.1:8545
-PRIVATE_KEY=your_private_key_here
-CONTRACT_ADDRESS=0x...
-PINATA_JWT=your_pinata_jwt
-```
-
-## License
-
-MIT

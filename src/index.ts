@@ -22,7 +22,7 @@ program
   .command("hash")
   .description("Calculate the content hash of a YAMO block")
   .argument("<file>", "Path to the YAMO file")
-  .action((file) => {
+  .action((file: string) => {
     try {
       const content = fs.readFileSync(file, "utf8").trim();
       const hash = crypto.createHash("sha256").update(content).digest("hex");
@@ -38,7 +38,7 @@ program
   .description("Initialize a new YAMO block template")
   .argument("<agent_name>", "Name of the agent")
   .option("-i, --intent <intent>", "Agent intent", "execute_task")
-  .action((agent_name, options) => {
+  .action((agent_name: string, options: any) => {
     const template = `
 agent: ${agent_name};
 intent: ${options.intent};
@@ -68,7 +68,9 @@ program
   .option("--consensus <type>", "Consensus Type", "cli_manual")
   .option("--ledger <name>", "Ledger Name", "yamo_cli")
   .option("--ipfs", "Upload content to IPFS before submitting")
-  .action(async (file, options) => {
+  .option("-e, --encrypt", "Encrypt the bundle")
+  .option("-k, --key <key>", "Encryption key (or set YAMO_ENCRYPTION_KEY)")
+  .action(async (file: string, options: any) => {
     try {
       const content = fs.readFileSync(file, "utf8").trim();
       const contentHash = "0x" + crypto.createHash("sha256").update(content).digest("hex");
@@ -88,8 +90,17 @@ program
             files.push({ name: artifactName, content: fs.readFileSync(artifactPath, "utf8") });
           }
         }
+        
+        let encryptionKey = undefined;
+        if (options.encrypt) {
+            encryptionKey = options.key || process.env.YAMO_ENCRYPTION_KEY;
+            if (!encryptionKey) {
+                throw new Error("Encryption enabled but no key provided. Use --key or YAMO_ENCRYPTION_KEY.");
+            }
+            console.log(chalk.yellow("🔒 Encrypting bundle..."));
+        }
 
-        ipfsCID = await ipfsManager.upload({ content, files });
+        ipfsCID = await ipfsManager.upload({ content, files, encryptionKey });
         console.log(chalk.cyan(`IPFS Bundle CID: ${ipfsCID}`));
       }
 
@@ -111,7 +122,8 @@ program
   .command("audit")
   .description("Audit a block's integrity (Chain vs IPFS)")
   .argument("<blockId>", "Block ID to audit")
-  .action(async (blockId) => {
+  .option("-k, --key <key>", "Decryption key")
+  .action(async (blockId: string, options: any) => {
     try {
       console.log(chalk.blue(`Auditing Block ${blockId}...`));
       
@@ -132,7 +144,9 @@ program
       }
 
       console.log(chalk.blue("Fetching content from IPFS..."));
-      const content = await ipfsManager.download(block.ipfsCID);
+      
+      const key = options.key || process.env.YAMO_ENCRYPTION_KEY;
+      const content = await ipfsManager.download(block.ipfsCID, key);
       
       const calcHash = "0x" + crypto.createHash("sha256").update(content).digest("hex");
       

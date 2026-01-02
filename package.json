@@ -1,0 +1,45 @@
+{
+  "name": "@yamo/cli",
+  "version": "1.0.0",
+  "description": "YAMO Protocol v0.4 - Command-line tools for blockchain integration",
+  "main": "dist/index.js",
+  "type": "commonjs",
+  "bin": {
+    "yamo": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "yamo",
+    "blockchain",
+    "cli",
+    "ethereum",
+    "ipfs",
+    "ai",
+    "agent"
+  ],
+  "author": "YAMO Protocol",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/form-data": "^2.2.1",
+    "@types/node": "^25.0.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@yamo/core": "^1.0.0",
+    "axios": "^1.13.2",
+    "dotenv": "^17.2.3",
+    "form-data": "^4.0.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yamo-protocol/yamo-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yamo-protocol/yamo-cli/issues"
+  },
+  "homepage": "https://github.com/yamo-protocol/yamo-cli#readme"
+}

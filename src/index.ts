@@ -5,7 +5,9 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import * as dotenv from "dotenv";
-import { IpfsManager, YamoChainClient, PROTOCOL_VERSION, CORE_VERSION } from "@yamo/core";
+import { IpfsManager, YamoChainClient } from "@yamo/core";
+
+const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
 
 dotenv.config();
 
@@ -16,7 +18,7 @@ const chainClient = new YamoChainClient();
 program
   .name("yamo")
   .description("YAMO Protocol CLI - Manage Agentic Reasoning Chains")
-  .version(CORE_VERSION);
+  .version(pkg.version);
 
 program
   .command("hash")
@@ -43,7 +45,7 @@ program
 agent: ${agent_name};
 intent: ${options.intent};
 context:
-  platform;yamo_v${PROTOCOL_VERSION};
+  platform;yamo_v0.5;
 constraints:
   - human_readable;true;
 priority: medium;

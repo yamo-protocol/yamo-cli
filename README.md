@@ -1,4 +1,4 @@
-# 💻 YAMO CLI [![npm version](https://badge.fury.io/js/@yamo%2Fcli.svg)](https://www.npmjs.com/package/@yamo/cli)
+# 💻 YAMO CLI [![npm version](https://img.shields.io/npm/v/@yamo/cli)](https://www.npmjs.com/package/@yamo/cli)
 
 The Command Line Interface for the YAMO Protocol. Now powered by `@yamo/core`.
 

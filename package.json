@@ -1,6 +1,6 @@
 {
   "name": "@yamo/cli",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "YAMO Protocol v0.4 - Command-line tools for blockchain integration",
   "main": "dist/index.js",
   "type": "commonjs",
@@ -40,7 +40,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@yamo/core": "^1.1.0",
+    "@yamo/core": "1.2.0",
     "axios": "^1.13.2",
     "chalk": "^4.1.2",
     "commander": "^12.0.0",

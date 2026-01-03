@@ -72,6 +72,26 @@ program
   .option("-k, --key <key>", "Encryption key (or set YAMO_ENCRYPTION_KEY)")
   .action(async (file: string, options: any) => {
     try {
+      // Validate password if encryption is enabled
+      if (options.encrypt) {
+        const key = options.key || process.env.YAMO_ENCRYPTION_KEY;
+        if (!key) {
+          throw new Error("Encryption enabled but no key provided. Use --key or set YAMO_ENCRYPTION_KEY");
+        }
+        try {
+          const { validatePasswordStrength } = await import("@yamo/core");
+          validatePasswordStrength(key);
+        } catch (e: any) {
+          console.error(chalk.red("Password validation failed:"));
+          console.error(chalk.red(e.message));
+          console.error(chalk.yellow("\nKey requirements:"));
+          console.error("  • Minimum 12 characters");
+          console.error("  • Mix of uppercase, lowercase, numbers, symbols");
+          console.error("  • Avoid common patterns (password, 123456, qwerty)");
+          throw e;
+        }
+      }
+
       const content = fs.readFileSync(file, "utf8").trim();
       const contentHash = "0x" + crypto.createHash("sha256").update(content).digest("hex");
       console.log(chalk.blue(`Calculated Hash: ${contentHash}`));
@@ -162,6 +182,61 @@ program
 
     } catch (error: any) {
       console.error(chalk.red(`Error: ${error.message}`));
+    }
+  });
+
+program
+  .command("download-bundle")
+  .description("Download complete IPFS bundle including all artifacts")
+  .argument("<cid>", "IPFS CID to download")
+  .option("-k, --key <key>", "Decryption key (if encrypted)")
+  .option("-o, --output <dir>", "Output directory (default: ./bundle_<cid>)", "./bundle_<cid>")
+  .action(async (cid: string, options: any) => {
+    try {
+      console.log(chalk.blue(`Downloading bundle ${cid}...`));
+
+      const { IpfsManager } = await import("@yamo/core");
+      const ipfs = new IpfsManager();
+      const key = options.key || process.env.YAMO_ENCRYPTION_KEY;
+
+      const bundle = await ipfs.downloadBundle(cid, key);
+
+      // Create output directory
+      const outputDir = options.output.replace("<cid>", cid.substring(0, 8));
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
+
+      // Write block.yamo
+      fs.writeFileSync(path.join(outputDir, "block.yamo"), bundle.block);
+      console.log(chalk.green(`✓ Downloaded block.yamo`));
+
+      // Write metadata
+      if (bundle.metadata) {
+        fs.writeFileSync(
+          path.join(outputDir, "metadata.json"),
+          JSON.stringify(bundle.metadata, null, 2)
+        );
+        console.log(chalk.green(`✓ Downloaded metadata.json`));
+      }
+
+      // Write artifact files
+      for (const [filename, content] of Object.entries(bundle.files)) {
+        const filePath = path.join(outputDir, filename);
+        fs.writeFileSync(filePath, content);
+        console.log(chalk.green(`✓ Downloaded ${filename}`));
+      }
+
+      console.log(chalk.green(`\nBundle saved to: ${outputDir}`));
+      console.log(chalk.gray(`Files: ${1 + Object.keys(bundle.files).length} total`));
+
+      if (bundle.metadata?.hasEncryption) {
+        console.log(chalk.yellow("🔒 Bundle was decrypted using provided key"));
+      }
+
+    } catch (error: any) {
+      console.error(chalk.red(`Error: ${error.message}`));
+      console.error(chalk.gray("\nIf the bundle is encrypted, provide --key or set YAMO_ENCRYPTION_KEY"));
     }
   });
 

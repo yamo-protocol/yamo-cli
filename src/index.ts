@@ -223,7 +223,7 @@ program
       // Write artifact files
       for (const [filename, content] of Object.entries(bundle.files)) {
         const filePath = path.join(outputDir, filename);
-        fs.writeFileSync(filePath, content);
+        fs.writeFileSync(filePath, content as string);
         console.log(chalk.green(`✓ Downloaded ${filename}`));
       }
 

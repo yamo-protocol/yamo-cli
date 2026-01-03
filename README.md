@@ -1,4 +1,4 @@
-# 💻 YAMO CLI (v1.0.0 - Protocol v0.4)
+# 💻 YAMO CLI [![npm version](https://badge.fury.io/js/@yamo%2Fcli.svg)](https://www.npmjs.com/package/@yamo/cli)
 
 The Command Line Interface for the YAMO Protocol. Now powered by `@yamo/core`.
 
@@ -18,7 +18,7 @@ Set environment variables or create a `.env` file:
 
 ```bash
 CONTRACT_ADDRESS=0x3c9440fa8d604E732233ea17095e14be1a53b015
-RPC_URL=https://rpc.sepolia.org
+RPC_URL=https://ethereum-sepolia-rpc.publicnode.com
 PRIVATE_KEY=0xYOUR_PRIVATE_KEY
 
 # IPFS Settings (optional)
@@ -30,7 +30,7 @@ PINATA_JWT=your_pinata_jwt_if_using_real_ipfs
 
 **Sepolia Testnet (default):**
 - Contract: `0x3c9440fa8d604E732233ea17095e14be1a53b015`
-- RPC: `https://rpc.sepolia.org` (free public RPC)
+- RPC: `https://ethereum-sepolia-rpc.publicnode.com` (free public RPC)
 
 **Local Development:**
 - Contract: Deploy using `@yamo/contracts`

@@ -106,10 +106,24 @@ program
 
         if (outputMatch) {
           const artifactName = outputMatch[1].trim();
+
+          // Security: Check for path traversal patterns in artifact name (Part 3: Security Fixes)
+          if (artifactName.includes('..') || artifactName.startsWith('/')) {
+            throw new Error(`Invalid artifact name: ${artifactName} (path-like names are not allowed)`);
+          }
+
           const artifactPath = path.join(path.dirname(file), artifactName);
-          if (fs.existsSync(artifactPath)) {
+
+          // Security: Resolve to absolute path and restrict to input file directory
+          const resolvedPath = path.resolve(artifactPath);
+          const inputDir = path.resolve(path.dirname(file));
+          if (!resolvedPath.startsWith(inputDir)) {
+            throw new Error(`Artifact path outside allowed directory: ${artifactName}`);
+          }
+
+          if (fs.existsSync(resolvedPath)) {
             console.log(chalk.cyan(`Bundling output: ${artifactName}`));
-            files.push({ name: artifactName, content: fs.readFileSync(artifactPath, "utf8") });
+            files.push({ name: artifactName, content: fs.readFileSync(resolvedPath, "utf8") });
           }
         }
         

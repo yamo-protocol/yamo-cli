@@ -144,9 +144,9 @@ program
       let resolvedPreviousBlock = options.prev;
       if (!resolvedPreviousBlock) {
         console.log(chalk.blue(`[INFO] No previousBlock provided, fetching latest block from chain...`));
-        const latestBlock = await chainClient.getLatestBlock();
-        if (latestBlock) {
-          resolvedPreviousBlock = latestBlock.contentHash;
+        const latestHash = await chainClient.getLatestBlockHash();
+        if (latestHash && latestHash !== "0x0000000000000000000000000000000000000000000000000000000000000000") {
+          resolvedPreviousBlock = latestHash;
           console.log(chalk.green(`[INFO] Using latest block's contentHash: ${resolvedPreviousBlock}`));
         } else {
           // No blocks exist yet, use genesis

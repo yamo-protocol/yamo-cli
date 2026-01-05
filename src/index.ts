@@ -66,7 +66,7 @@ program
   .description("Submit a YAMO block to the blockchain")
   .argument("<file>", "Path to the YAMO file")
   .requiredOption("--id <blockId>", "Unique Block ID")
-  .option("--prev <previousBlock>", "Previous Block Hash", "0")
+  .option("--prev <previousBlock>", "Previous Block Hash (omits to auto-fetch from chain)")
   .option("--consensus <type>", "Consensus Type", "cli_manual")
   .option("--ledger <name>", "Ledger Name", "yamo_cli")
   .option("--ipfs", "Upload content to IPFS before submitting")
@@ -140,9 +140,24 @@ program
         console.log(chalk.cyan(`IPFS Bundle CID: ${ipfsCID}`));
       }
 
+      // Auto-fetch previousBlock if not provided (chain continuation)
+      let resolvedPreviousBlock = options.prev;
+      if (!resolvedPreviousBlock) {
+        console.log(chalk.blue(`[INFO] No previousBlock provided, fetching latest block from chain...`));
+        const latestBlock = await chainClient.getLatestBlock();
+        if (latestBlock) {
+          resolvedPreviousBlock = latestBlock.contentHash;
+          console.log(chalk.green(`[INFO] Using latest block's contentHash: ${resolvedPreviousBlock}`));
+        } else {
+          // No blocks exist yet, use genesis
+          resolvedPreviousBlock = "0x0000000000000000000000000000000000000000000000000000000000000000";
+          console.log(chalk.yellow(`[INFO] No existing blocks found, using genesis`));
+        }
+      }
+
       await chainClient.submitBlock(
         options.id,
-        options.prev,
+        resolvedPreviousBlock,
         contentHash,
         options.consensus,
         options.ledger,

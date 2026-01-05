@@ -11,9 +11,158 @@ const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 
 
 dotenv.config();
 
+// Constants
+const CONSTANTS = {
+  HASH_PATTERN: /^0x[a-fA-F0-9]{64}$/,
+  GENESIS_HASH: "0x0000000000000000000000000000000000000000000000000000000000000000",
+  DEFAULT_FILENAME: "block.yamo",
+  DEFAULT_CONSENSUS: "cli_manual",
+  DEFAULT_LEDGER: "yamo_cli",
+  DEFAULT_INTENT: "execute_task",
+  HEX_PREFIX: "0x",
+  HASH_ALGORITHM: "sha256" as const,
+} as const;
+
+// TypeScript interfaces
+interface InitOptions {
+  intent: string;
+}
+
+interface SubmitOptions {
+  id: string;
+  prev?: string;
+  consensus: string;
+  ledger: string;
+  ipfs: boolean;
+  encrypt: boolean;
+  key?: string;
+}
+
+interface AuditOptions {
+  key?: string;
+}
+
+interface DownloadOptions {
+  key?: string;
+  output: string;
+}
+
 const program = new Command();
 const ipfsManager = new IpfsManager();
 const chainClient = new YamoChainClient();
+
+// Hash utilities
+const hash = {
+  sha256: (content: string): string => {
+    return crypto.createHash(CONSTANTS.HASH_ALGORITHM).update(content).digest("hex");
+  },
+  bytes32: (content: string): string => {
+    return `${CONSTANTS.HEX_PREFIX}${hash.sha256(content)}`;
+  },
+};
+
+// Response formatting helpers
+const format = {
+  success: (msg: string) => console.log(chalk.green(msg)),
+  error: (msg: string) => console.error(chalk.red(`Error: ${msg}`)),
+  info: (msg: string) => console.log(chalk.blue(msg)),
+  warn: (msg: string) => console.log(chalk.yellow(msg)),
+  detail: (msg: string) => console.log(chalk.gray(msg)),
+  value: (msg: string) => console.log(chalk.cyan(msg)),
+};
+
+// Error handling helper
+function handleCommandError(error: unknown, context?: string): void {
+  if (error instanceof Error) {
+    const message = context ? `${context}: ${error.message}` : error.message;
+    format.error(message);
+  } else {
+    format.error("Unknown error occurred");
+  }
+}
+
+// Validation helpers
+function validateBytes32(value: string, fieldName: string): void {
+  if (!value.match(CONSTANTS.HASH_PATTERN)) {
+    throw new Error(
+      `${fieldName} must be a valid bytes32 hash (0x + 64 hex chars). ` +
+      `Received: ${value.substring(0, 20)}...` +
+      `\nDo NOT include algorithm prefixes like "sha256:"`
+    );
+  }
+}
+
+function validateBlockId(blockId: string): void {
+  if (!blockId) throw new Error("blockId is required");
+
+  const parts = blockId.split('_');
+  if (parts.length < 2) {
+    throw new Error(`blockId must follow format {origin}_{workflow} (e.g., 'claude_chain'). Received: ${blockId}`);
+  }
+}
+
+// Submit command helpers
+async function validateEncryptionKey(key: string): Promise<void> {
+  const { validatePasswordStrength } = await import("@yamo/core");
+  try {
+    validatePasswordStrength(key);
+  } catch (e: any) {
+    format.error("Password validation failed:");
+    format.error(e.message);
+    format.warn("\nKey requirements:");
+    console.error("  • Minimum 12 characters");
+    console.error("  • Mix of uppercase, lowercase, numbers, symbols");
+    console.error("  • Avoid common patterns (password, 123456, qwerty)");
+    throw e;
+  }
+}
+
+function prepareIpfsFiles(content: string, file: string): Array<{ name: string; content: string }> {
+  const files: Array<{ name: string; content: string }> = [{ name: CONSTANTS.DEFAULT_FILENAME, content }];
+  const outputMatch = content.match(/output:\s*([^;]+);/);
+
+  if (outputMatch) {
+    const artifactName = outputMatch[1].trim();
+
+    // Security: Check for path traversal patterns
+    if (artifactName.includes('..') || artifactName.startsWith('/')) {
+      throw new Error(`Invalid artifact name: ${artifactName} (path-like names are not allowed)`);
+    }
+
+    const artifactPath = path.join(path.dirname(file), artifactName);
+    const resolvedPath = path.resolve(artifactPath);
+    const inputDir = path.resolve(path.dirname(file));
+
+    if (!resolvedPath.startsWith(inputDir)) {
+      throw new Error(`Artifact path outside allowed directory: ${artifactName}`);
+    }
+
+    if (fs.existsSync(resolvedPath)) {
+      format.info(`Bundling output: ${artifactName}`);
+      files.push({ name: artifactName, content: fs.readFileSync(resolvedPath, "utf8") });
+    }
+  }
+
+  return files;
+}
+
+async function resolvePreviousBlock(prev?: string): Promise<string> {
+  if (prev) {
+    validateBytes32(prev, "previousBlock");
+    return prev;
+  }
+
+  format.info("[INFO] No previousBlock provided, fetching latest block from chain...");
+  const latestHash = await chainClient.getLatestBlockHash();
+
+  if (latestHash && latestHash !== CONSTANTS.GENESIS_HASH) {
+    format.success(`[INFO] Using latest block's contentHash: ${latestHash}`);
+    return latestHash;
+  }
+
+  format.warn("[INFO] No existing blocks found, using genesis");
+  return CONSTANTS.GENESIS_HASH;
+}
 
 program
   .name("yamo")
@@ -27,11 +176,11 @@ program
   .action((file: string) => {
     try {
       const content = fs.readFileSync(file, "utf8").trim();
-      const hash = crypto.createHash("sha256").update(content).digest("hex");
-      console.log(chalk.green("Block Content Hash:"));
-      console.log(chalk.cyan(`0x${hash}`));
-    } catch (error: any) {
-      console.error(chalk.red(`Error: ${error.message}`));
+      const contentHash = hash.bytes32(content);
+      format.success("Block Content Hash:");
+      format.value(contentHash);
+    } catch (error) {
+      handleCommandError(error);
     }
   });
 
@@ -39,9 +188,10 @@ program
   .command("init")
   .description("Initialize a new YAMO block template")
   .argument("<agent_name>", "Name of the agent")
-  .option("-i, --intent <intent>", "Agent intent", "execute_task")
-  .action((agent_name: string, options: any) => {
-    const template = `
+  .option("-i, --intent <intent>", "Agent intent", CONSTANTS.DEFAULT_INTENT)
+  .action((agent_name: string, options: InitOptions) => {
+    try {
+      const template = `
 agent: ${agent_name};
 intent: ${options.intent};
 context:
@@ -56,9 +206,11 @@ log: session_start;timestamp;${new Date().toISOString()};
 handoff: User;
     `.trim();
 
-    const filename = "block.yamo";
-    fs.writeFileSync(filename, template);
-    console.log(chalk.green(`Created YAMO template: ${chalk.bold(filename)}`));
+      fs.writeFileSync(CONSTANTS.DEFAULT_FILENAME, template);
+      format.success(`Created YAMO template: ${chalk.bold(CONSTANTS.DEFAULT_FILENAME)}`);
+    } catch (error) {
+      handleCommandError(error);
+    }
   });
 
 program
@@ -67,94 +219,51 @@ program
   .argument("<file>", "Path to the YAMO file")
   .requiredOption("--id <blockId>", "Unique Block ID")
   .option("--prev <previousBlock>", "Previous Block Hash (omits to auto-fetch from chain)")
-  .option("--consensus <type>", "Consensus Type", "cli_manual")
-  .option("--ledger <name>", "Ledger Name", "yamo_cli")
+  .option("--consensus <type>", "Consensus Type", CONSTANTS.DEFAULT_CONSENSUS)
+  .option("--ledger <name>", "Ledger Name", CONSTANTS.DEFAULT_LEDGER)
   .option("--ipfs", "Upload content to IPFS before submitting")
   .option("-e, --encrypt", "Encrypt the bundle")
   .option("-k, --key <key>", "Encryption key (or set YAMO_ENCRYPTION_KEY)")
-  .action(async (file: string, options: any) => {
+  .action(async (file: string, options: SubmitOptions) => {
     try {
-      // Validate password if encryption is enabled
+      // Validate inputs
+      validateBlockId(options.id);
+
+      // Validate encryption key if needed
       if (options.encrypt) {
         const key = options.key || process.env.YAMO_ENCRYPTION_KEY;
         if (!key) {
           throw new Error("Encryption enabled but no key provided. Use --key or set YAMO_ENCRYPTION_KEY");
         }
-        try {
-          const { validatePasswordStrength } = await import("@yamo/core");
-          validatePasswordStrength(key);
-        } catch (e: any) {
-          console.error(chalk.red("Password validation failed:"));
-          console.error(chalk.red(e.message));
-          console.error(chalk.yellow("\nKey requirements:"));
-          console.error("  • Minimum 12 characters");
-          console.error("  • Mix of uppercase, lowercase, numbers, symbols");
-          console.error("  • Avoid common patterns (password, 123456, qwerty)");
-          throw e;
-        }
+        await validateEncryptionKey(key);
       }
 
+      // Calculate content hash
       const content = fs.readFileSync(file, "utf8").trim();
-      const contentHash = "0x" + crypto.createHash("sha256").update(content).digest("hex");
-      console.log(chalk.blue(`Calculated Hash: ${contentHash}`));
+      const contentHash = hash.bytes32(content);
+      format.info(`Calculated Hash: ${contentHash}`);
 
-      let ipfsCID = undefined;
-      
+      // Handle IPFS upload
+      let ipfsCID: string | undefined;
       if (options.ipfs) {
-        const outputMatch = content.match(/output:\s*([^;]+);/);
-        const files = [{ name: "block.yamo", content }];
+        const files = prepareIpfsFiles(content, file);
 
-        if (outputMatch) {
-          const artifactName = outputMatch[1].trim();
+        const encryptionKey = options.encrypt
+          ? (options.key || process.env.YAMO_ENCRYPTION_KEY)
+          : undefined;
 
-          // Security: Check for path traversal patterns in artifact name (Part 3: Security Fixes)
-          if (artifactName.includes('..') || artifactName.startsWith('/')) {
-            throw new Error(`Invalid artifact name: ${artifactName} (path-like names are not allowed)`);
-          }
-
-          const artifactPath = path.join(path.dirname(file), artifactName);
-
-          // Security: Resolve to absolute path and restrict to input file directory
-          const resolvedPath = path.resolve(artifactPath);
-          const inputDir = path.resolve(path.dirname(file));
-          if (!resolvedPath.startsWith(inputDir)) {
-            throw new Error(`Artifact path outside allowed directory: ${artifactName}`);
-          }
-
-          if (fs.existsSync(resolvedPath)) {
-            console.log(chalk.cyan(`Bundling output: ${artifactName}`));
-            files.push({ name: artifactName, content: fs.readFileSync(resolvedPath, "utf8") });
-          }
-        }
-        
-        let encryptionKey = undefined;
-        if (options.encrypt) {
-            encryptionKey = options.key || process.env.YAMO_ENCRYPTION_KEY;
-            if (!encryptionKey) {
-                throw new Error("Encryption enabled but no key provided. Use --key or YAMO_ENCRYPTION_KEY.");
-            }
-            console.log(chalk.yellow("🔒 Encrypting bundle..."));
+        if (encryptionKey) {
+          format.warn("🔒 Encrypting bundle...");
         }
 
         ipfsCID = await ipfsManager.upload({ content, files, encryptionKey });
-        console.log(chalk.cyan(`IPFS Bundle CID: ${ipfsCID}`));
+        format.info(`IPFS Bundle CID: ${ipfsCID}`);
       }
 
-      // Auto-fetch previousBlock if not provided (chain continuation)
-      let resolvedPreviousBlock = options.prev;
-      if (!resolvedPreviousBlock) {
-        console.log(chalk.blue(`[INFO] No previousBlock provided, fetching latest block from chain...`));
-        const latestHash = await chainClient.getLatestBlockHash();
-        if (latestHash && latestHash !== "0x0000000000000000000000000000000000000000000000000000000000000000") {
-          resolvedPreviousBlock = latestHash;
-          console.log(chalk.green(`[INFO] Using latest block's contentHash: ${resolvedPreviousBlock}`));
-        } else {
-          // No blocks exist yet, use genesis
-          resolvedPreviousBlock = "0x0000000000000000000000000000000000000000000000000000000000000000";
-          console.log(chalk.yellow(`[INFO] No existing blocks found, using genesis`));
-        }
-      }
+      // Resolve previous block
+      const resolvedPreviousBlock = await resolvePreviousBlock(options.prev);
 
+      // Submit to blockchain
       await chainClient.submitBlock(
         options.id,
         resolvedPreviousBlock,
@@ -164,8 +273,8 @@ program
         ipfsCID
       );
 
-    } catch (error: any) {
-      console.error(chalk.red(`Error: ${error.message}`));
+    } catch (error) {
+      handleCommandError(error);
     }
   });
 
@@ -174,45 +283,44 @@ program
   .description("Audit a block's integrity (Chain vs IPFS)")
   .argument("<blockId>", "Block ID to audit")
   .option("-k, --key <key>", "Decryption key")
-  .action(async (blockId: string, options: any) => {
+  .action(async (blockId: string, options: AuditOptions) => {
     try {
-      console.log(chalk.blue(`Auditing Block ${blockId}...`));
-      
+      format.info(`Auditing Block ${blockId}...`);
+
       const block = await chainClient.getBlock(blockId);
       if (!block) {
-        console.error(chalk.red("Block not found on-chain."));
+        format.error("Block not found on-chain.");
         return;
       }
 
-      console.log(chalk.gray(`Found on-chain record:`));
+      format.detail("Found on-chain record:");
       console.log(`  Agent: ${block.agentAddress}`);
       console.log(`  Hash:  ${block.contentHash}`);
       console.log(`  IPFS:  ${block.ipfsCID || "None"}`);
 
       if (!block.ipfsCID) {
-        console.log(chalk.yellow("⚠️  No IPFS CID. Cannot perform deep content audit."));
+        format.warn("⚠️  No IPFS CID. Cannot perform deep content audit.");
         return;
       }
 
-      console.log(chalk.blue("Fetching content from IPFS..."));
-      
+      format.info("Fetching content from IPFS...");
+
       const key = options.key || process.env.YAMO_ENCRYPTION_KEY;
       const content = await ipfsManager.download(block.ipfsCID, key);
-      
-      const calcHash = "0x" + crypto.createHash("sha256").update(content).digest("hex");
-      
+      const calcHash = hash.bytes32(content);
+
       console.log(`  Calculated: ${calcHash}`);
-      
+
       if (calcHash === block.contentHash) {
-        console.log(chalk.green("✅ INTEGRITY VERIFIED: Content matches chain hash."));
+        format.success("✅ INTEGRITY VERIFIED: Content matches chain hash.");
       } else {
-        console.log(chalk.red("❌ INTEGRITY FAILED: Hash mismatch!"));
+        format.error("❌ INTEGRITY FAILED: Hash mismatch!");
         console.log(`  Expected: ${block.contentHash}`);
         console.log(`  Got:      ${calcHash}`);
       }
 
-    } catch (error: any) {
-      console.error(chalk.red(`Error: ${error.message}`));
+    } catch (error) {
+      handleCommandError(error);
     }
   });
 
@@ -222,14 +330,13 @@ program
   .argument("<cid>", "IPFS CID to download")
   .option("-k, --key <key>", "Decryption key (if encrypted)")
   .option("-o, --output <dir>", "Output directory (default: ./bundle_<cid>)", "./bundle_<cid>")
-  .action(async (cid: string, options: any) => {
+  .action(async (cid: string, options: DownloadOptions) => {
     try {
-      console.log(chalk.blue(`Downloading bundle ${cid}...`));
+      format.info(`Downloading bundle ${cid}...`);
 
       const { IpfsManager } = await import("@yamo/core");
       const ipfs = new IpfsManager();
       const key = options.key || process.env.YAMO_ENCRYPTION_KEY;
-
       const bundle = await ipfs.downloadBundle(cid, key);
 
       // Create output directory
@@ -239,8 +346,8 @@ program
       }
 
       // Write block.yamo
-      fs.writeFileSync(path.join(outputDir, "block.yamo"), bundle.block);
-      console.log(chalk.green(`✓ Downloaded block.yamo`));
+      fs.writeFileSync(path.join(outputDir, CONSTANTS.DEFAULT_FILENAME), bundle.block);
+      format.success(`✓ Downloaded ${CONSTANTS.DEFAULT_FILENAME}`);
 
       // Write metadata
       if (bundle.metadata) {
@@ -248,26 +355,26 @@ program
           path.join(outputDir, "metadata.json"),
           JSON.stringify(bundle.metadata, null, 2)
         );
-        console.log(chalk.green(`✓ Downloaded metadata.json`));
+        format.success("✓ Downloaded metadata.json");
       }
 
       // Write artifact files
       for (const [filename, content] of Object.entries(bundle.files)) {
         const filePath = path.join(outputDir, filename);
         fs.writeFileSync(filePath, content as string);
-        console.log(chalk.green(`✓ Downloaded ${filename}`));
+        format.success(`✓ Downloaded ${filename}`);
       }
 
-      console.log(chalk.green(`\nBundle saved to: ${outputDir}`));
-      console.log(chalk.gray(`Files: ${1 + Object.keys(bundle.files).length} total`));
+      format.success(`\nBundle saved to: ${outputDir}`);
+      format.detail(`Files: ${1 + Object.keys(bundle.files).length} total`);
 
       if (bundle.metadata?.hasEncryption) {
-        console.log(chalk.yellow("🔒 Bundle was decrypted using provided key"));
+        format.warn("🔒 Bundle was decrypted using provided key");
       }
 
-    } catch (error: any) {
-      console.error(chalk.red(`Error: ${error.message}`));
-      console.error(chalk.gray("\nIf the bundle is encrypted, provide --key or set YAMO_ENCRYPTION_KEY"));
+    } catch (error) {
+      handleCommandError(error);
+      format.detail("\nIf the bundle is encrypted, provide --key or set YAMO_ENCRYPTION_KEY");
     }
   });
 

@@ -7,6 +7,7 @@ import path from 'path';
 import * as dotenv from 'dotenv';
 import { IpfsManager, YamoChainClient } from '@yamo/core';
 import { CONSTANTS } from './utils/constants.js';
+import { format } from './utils/format.js';
 import type { InitOptions, SubmitOptions, AuditOptions, DownloadOptions } from './types/index.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
@@ -25,16 +26,6 @@ const hash = {
   bytes32: (content: string): string => {
     return `${CONSTANTS.HEX_PREFIX}${hash.sha256(content)}`;
   },
-};
-
-// Response formatting helpers
-const format = {
-  success: (msg: string) => console.log(chalk.green(msg)),
-  error: (msg: string) => console.error(chalk.red(`Error: ${msg}`)),
-  info: (msg: string) => console.log(chalk.blue(msg)),
-  warn: (msg: string) => console.log(chalk.yellow(msg)),
-  detail: (msg: string) => console.log(chalk.gray(msg)),
-  value: (msg: string) => console.log(chalk.cyan(msg)),
 };
 
 // Error handling helper

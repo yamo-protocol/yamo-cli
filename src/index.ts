@@ -8,6 +8,7 @@ import * as dotenv from 'dotenv';
 import { IpfsManager, YamoChainClient } from '@yamo/core';
 import { CONSTANTS } from './utils/constants.js';
 import { format } from './utils/format.js';
+import { validateBytes32, validateBlockId, validateArtifactPath } from './utils/validation.js';
 import type { InitOptions, SubmitOptions, AuditOptions, DownloadOptions } from './types/index.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
@@ -38,9 +39,9 @@ function handleCommandError(error: unknown, context?: string): void {
   }
 }
 
-// Validation helpers
-function validateBytes32(value: string, fieldName: string): void {
-  if (!value.match(CONSTANTS.HASH_PATTERN)) {
+// Submit command helpers
+function validateBytes32Hash(value: string, fieldName: string): void {
+  if (!validateBytes32(value)) {
     throw new Error(
       `${fieldName} must be a valid bytes32 hash (0x + 64 hex chars). ` +
         `Received: ${value.substring(0, 20)}...` +
@@ -49,11 +50,10 @@ function validateBytes32(value: string, fieldName: string): void {
   }
 }
 
-function validateBlockId(blockId: string): void {
+function validateBlockIdFormat(blockId: string): void {
   if (!blockId) throw new Error('blockId is required');
 
-  const parts = blockId.split('_');
-  if (parts.length < 2) {
+  if (!validateBlockId(blockId)) {
     throw new Error(
       `blockId must follow format {origin}_{workflow} (e.g., 'claude_chain'). Received: ${blockId}`
     );
@@ -85,18 +85,12 @@ function prepareIpfsFiles(content: string, file: string): Array<{ name: string; 
   if (outputMatch) {
     const artifactName = outputMatch[1].trim();
 
-    // Security: Check for path traversal patterns
-    if (artifactName.includes('..') || artifactName.startsWith('/')) {
-      throw new Error(`Invalid artifact name: ${artifactName} (path-like names are not allowed)`);
-    }
-
     const artifactPath = path.join(path.dirname(file), artifactName);
     const resolvedPath = path.resolve(artifactPath);
     const inputDir = path.resolve(path.dirname(file));
 
-    if (!resolvedPath.startsWith(inputDir)) {
-      throw new Error(`Artifact path outside allowed directory: ${artifactName}`);
-    }
+    // Security: Validate artifact path
+    validateArtifactPath(artifactName, resolvedPath, inputDir);
 
     if (fs.existsSync(resolvedPath)) {
       format.info(`Bundling output: ${artifactName}`);
@@ -109,7 +103,7 @@ function prepareIpfsFiles(content: string, file: string): Array<{ name: string; 
 
 async function resolvePreviousBlock(prev?: string): Promise<string> {
   if (prev) {
-    validateBytes32(prev, 'previousBlock');
+    validateBytes32Hash(prev, 'previousBlock');
     return prev;
   }
 
@@ -188,7 +182,7 @@ program
   .action(async (file: string, options: SubmitOptions) => {
     try {
       // Validate inputs
-      validateBlockId(options.id);
+      validateBlockIdFormat(options.id);
 
       // Validate encryption key if needed
       if (options.encrypt) {

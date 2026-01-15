@@ -1,117 +1,17 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import chalk from 'chalk';
-import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import * as dotenv from 'dotenv';
-import { IpfsManager, YamoChainClient } from '@yamo/core';
 import { CONSTANTS } from './utils/constants.js';
-import { format, handleCommandError } from './utils/format.js';
-import { validateBytes32, validateBlockId, validateArtifactPath } from './utils/validation.js';
-import type { InitOptions, SubmitOptions, AuditOptions, DownloadOptions } from './types/index.js';
 import { hashCommand } from './commands/hash.js';
 import { initCommand } from './commands/init.js';
 import { auditCommand } from './commands/audit.js';
 import { downloadBundleCommand } from './commands/download-bundle.js';
+import { submitCommand } from './commands/submit.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
 
-dotenv.config();
-
 const program = new Command();
-const ipfsManager = new IpfsManager();
-const chainClient = new YamoChainClient();
-
-// Hash utilities
-const hash = {
-  sha256: (content: string): string => {
-    return crypto.createHash(CONSTANTS.HASH_ALGORITHM).update(content).digest('hex');
-  },
-  bytes32: (content: string): string => {
-    return `${CONSTANTS.HEX_PREFIX}${hash.sha256(content)}`;
-  },
-};
-
-// Submit command helpers
-function validateBytes32Hash(value: string, fieldName: string): void {
-  if (!validateBytes32(value)) {
-    throw new Error(
-      `${fieldName} must be a valid bytes32 hash (0x + 64 hex chars). ` +
-        `Received: ${value.substring(0, 20)}...` +
-        `\nDo NOT include algorithm prefixes like "sha256:"`
-    );
-  }
-}
-
-function validateBlockIdFormat(blockId: string): void {
-  if (!blockId) throw new Error('blockId is required');
-
-  if (!validateBlockId(blockId)) {
-    throw new Error(
-      `blockId must follow format {origin}_{workflow} (e.g., 'claude_chain'). Received: ${blockId}`
-    );
-  }
-}
-
-// Submit command helpers
-async function validateEncryptionKey(key: string): Promise<void> {
-  const { validatePasswordStrength } = await import('@yamo/core');
-  try {
-    validatePasswordStrength(key);
-  } catch (e: any) {
-    format.error('Password validation failed:');
-    format.error(e.message);
-    format.warn('\nKey requirements:');
-    console.error('  • Minimum 12 characters');
-    console.error('  • Mix of uppercase, lowercase, numbers, symbols');
-    console.error('  • Avoid common patterns (password, 123456, qwerty)');
-    throw e;
-  }
-}
-
-function prepareIpfsFiles(content: string, file: string): Array<{ name: string; content: string }> {
-  const files: Array<{ name: string; content: string }> = [
-    { name: CONSTANTS.DEFAULT_FILENAME, content },
-  ];
-  const outputMatch = content.match(/output:\s*([^;]+);/);
-
-  if (outputMatch) {
-    const artifactName = outputMatch[1].trim();
-
-    const artifactPath = path.join(path.dirname(file), artifactName);
-    const resolvedPath = path.resolve(artifactPath);
-    const inputDir = path.resolve(path.dirname(file));
-
-    // Security: Validate artifact path
-    validateArtifactPath(artifactName, resolvedPath, inputDir);
-
-    if (fs.existsSync(resolvedPath)) {
-      format.info(`Bundling output: ${artifactName}`);
-      files.push({ name: artifactName, content: fs.readFileSync(resolvedPath, 'utf8') });
-    }
-  }
-
-  return files;
-}
-
-async function resolvePreviousBlock(prev?: string): Promise<string> {
-  if (prev) {
-    validateBytes32Hash(prev, 'previousBlock');
-    return prev;
-  }
-
-  format.info('[INFO] No previousBlock provided, fetching latest block from chain...');
-  const latestHash = await chainClient.getLatestBlockHash();
-
-  if (latestHash && latestHash !== CONSTANTS.GENESIS_HASH) {
-    format.success(`[INFO] Using latest block's contentHash: ${latestHash}`);
-    return latestHash;
-  }
-
-  format.warn('[INFO] No existing blocks found, using genesis');
-  return CONSTANTS.GENESIS_HASH;
-}
 
 program
   .name('yamo')
@@ -142,60 +42,7 @@ program
   .option('--ipfs', 'Upload content to IPFS before submitting')
   .option('-e, --encrypt', 'Encrypt the bundle')
   .option('-k, --key <key>', 'Encryption key (or set YAMO_ENCRYPTION_KEY)')
-  .action(async (file: string, options: SubmitOptions) => {
-    try {
-      // Validate inputs
-      validateBlockIdFormat(options.id);
-
-      // Validate encryption key if needed
-      if (options.encrypt) {
-        const key = options.key || process.env.YAMO_ENCRYPTION_KEY;
-        if (!key) {
-          throw new Error(
-            'Encryption enabled but no key provided. Use --key or set YAMO_ENCRYPTION_KEY'
-          );
-        }
-        await validateEncryptionKey(key);
-      }
-
-      // Calculate content hash
-      const content = fs.readFileSync(file, 'utf8').trim();
-      const contentHash = hash.bytes32(content);
-      format.info(`Calculated Hash: ${contentHash}`);
-
-      // Handle IPFS upload
-      let ipfsCID: string | undefined;
-      if (options.ipfs) {
-        const files = prepareIpfsFiles(content, file);
-
-        const encryptionKey = options.encrypt
-          ? options.key || process.env.YAMO_ENCRYPTION_KEY
-          : undefined;
-
-        if (encryptionKey) {
-          format.warn('🔒 Encrypting bundle...');
-        }
-
-        ipfsCID = await ipfsManager.upload({ content, files, encryptionKey });
-        format.info(`IPFS Bundle CID: ${ipfsCID}`);
-      }
-
-      // Resolve previous block
-      const resolvedPreviousBlock = await resolvePreviousBlock(options.prev);
-
-      // Submit to blockchain
-      await chainClient.submitBlock(
-        options.id,
-        resolvedPreviousBlock,
-        contentHash,
-        options.consensus,
-        options.ledger,
-        ipfsCID
-      );
-    } catch (error) {
-      handleCommandError(error);
-    }
-  });
+  .action(submitCommand);
 
 program
   .command('audit')

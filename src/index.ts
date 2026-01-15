@@ -7,7 +7,7 @@ import path from 'path';
 import * as dotenv from 'dotenv';
 import { IpfsManager, YamoChainClient } from '@yamo/core';
 import { CONSTANTS } from './utils/constants.js';
-import { format } from './utils/format.js';
+import { format, handleCommandError } from './utils/format.js';
 import { validateBytes32, validateBlockId, validateArtifactPath } from './utils/validation.js';
 import type { InitOptions, SubmitOptions, AuditOptions, DownloadOptions } from './types/index.js';
 
@@ -28,16 +28,6 @@ const hash = {
     return `${CONSTANTS.HEX_PREFIX}${hash.sha256(content)}`;
   },
 };
-
-// Error handling helper
-function handleCommandError(error: unknown, context?: string): void {
-  if (error instanceof Error) {
-    const message = context ? `${context}: ${error.message}` : error.message;
-    format.error(message);
-  } else {
-    format.error('Unknown error occurred');
-  }
-}
 
 // Submit command helpers
 function validateBytes32Hash(value: string, fieldName: string): void {

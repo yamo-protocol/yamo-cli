@@ -10,6 +10,7 @@ import { CONSTANTS } from './utils/constants.js';
 import { format, handleCommandError } from './utils/format.js';
 import { validateBytes32, validateBlockId, validateArtifactPath } from './utils/validation.js';
 import type { InitOptions, SubmitOptions, AuditOptions, DownloadOptions } from './types/index.js';
+import { hashCommand } from './commands/hash.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
 
@@ -118,16 +119,7 @@ program
   .command('hash')
   .description('Calculate the content hash of a YAMO block')
   .argument('<file>', 'Path to the YAMO file')
-  .action((file: string) => {
-    try {
-      const content = fs.readFileSync(file, 'utf8').trim();
-      const contentHash = hash.bytes32(content);
-      format.success('Block Content Hash:');
-      format.value(contentHash);
-    } catch (error) {
-      handleCommandError(error);
-    }
-  });
+  .action(hashCommand);
 
 program
   .command('init')

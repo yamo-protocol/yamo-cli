@@ -13,6 +13,7 @@ import type { InitOptions, SubmitOptions, AuditOptions, DownloadOptions } from '
 import { hashCommand } from './commands/hash.js';
 import { initCommand } from './commands/init.js';
 import { auditCommand } from './commands/audit.js';
+import { downloadBundleCommand } from './commands/download-bundle.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
 
@@ -209,51 +210,6 @@ program
   .argument('<cid>', 'IPFS CID to download')
   .option('-k, --key <key>', 'Decryption key (if encrypted)')
   .option('-o, --output <dir>', 'Output directory (default: ./bundle_<cid>)', './bundle_<cid>')
-  .action(async (cid: string, options: DownloadOptions) => {
-    try {
-      format.info(`Downloading bundle ${cid}...`);
-
-      const { IpfsManager } = await import('@yamo/core');
-      const ipfs = new IpfsManager();
-      const key = options.key || process.env.YAMO_ENCRYPTION_KEY;
-      const bundle = await ipfs.downloadBundle(cid, key);
-
-      // Create output directory
-      const outputDir = options.output.replace('<cid>', cid.substring(0, 8));
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-
-      // Write block.yamo
-      fs.writeFileSync(path.join(outputDir, CONSTANTS.DEFAULT_FILENAME), bundle.block);
-      format.success(`✓ Downloaded ${CONSTANTS.DEFAULT_FILENAME}`);
-
-      // Write metadata
-      if (bundle.metadata) {
-        fs.writeFileSync(
-          path.join(outputDir, 'metadata.json'),
-          JSON.stringify(bundle.metadata, null, 2)
-        );
-        format.success('✓ Downloaded metadata.json');
-      }
-
-      // Write artifact files
-      for (const [filename, content] of Object.entries(bundle.files)) {
-        const filePath = path.join(outputDir, filename);
-        fs.writeFileSync(filePath, content as string);
-        format.success(`✓ Downloaded ${filename}`);
-      }
-
-      format.success(`\nBundle saved to: ${outputDir}`);
-      format.detail(`Files: ${1 + Object.keys(bundle.files).length} total`);
-
-      if (bundle.metadata?.hasEncryption) {
-        format.warn('🔒 Bundle was decrypted using provided key');
-      }
-    } catch (error) {
-      handleCommandError(error);
-      format.detail('\nIf the bundle is encrypted, provide --key or set YAMO_ENCRYPTION_KEY');
-    }
-  });
+  .action(downloadBundleCommand);
 
 program.parse();

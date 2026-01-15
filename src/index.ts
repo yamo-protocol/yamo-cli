@@ -12,6 +12,7 @@ import { validateBytes32, validateBlockId, validateArtifactPath } from './utils/
 import type { InitOptions, SubmitOptions, AuditOptions, DownloadOptions } from './types/index.js';
 import { hashCommand } from './commands/hash.js';
 import { initCommand } from './commands/init.js';
+import { auditCommand } from './commands/audit.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
 
@@ -200,45 +201,7 @@ program
   .description("Audit a block's integrity (Chain vs IPFS)")
   .argument('<blockId>', 'Block ID to audit')
   .option('-k, --key <key>', 'Decryption key')
-  .action(async (blockId: string, options: AuditOptions) => {
-    try {
-      format.info(`Auditing Block ${blockId}...`);
-
-      const block = await chainClient.getBlock(blockId);
-      if (!block) {
-        format.error('Block not found on-chain.');
-        return;
-      }
-
-      format.detail('Found on-chain record:');
-      console.log(`  Agent: ${block.agentAddress}`);
-      console.log(`  Hash:  ${block.contentHash}`);
-      console.log(`  IPFS:  ${block.ipfsCID || 'None'}`);
-
-      if (!block.ipfsCID) {
-        format.warn('⚠️  No IPFS CID. Cannot perform deep content audit.');
-        return;
-      }
-
-      format.info('Fetching content from IPFS...');
-
-      const key = options.key || process.env.YAMO_ENCRYPTION_KEY;
-      const content = await ipfsManager.download(block.ipfsCID, key);
-      const calcHash = hash.bytes32(content);
-
-      console.log(`  Calculated: ${calcHash}`);
-
-      if (calcHash === block.contentHash) {
-        format.success('✅ INTEGRITY VERIFIED: Content matches chain hash.');
-      } else {
-        format.error('❌ INTEGRITY FAILED: Hash mismatch!');
-        console.log(`  Expected: ${block.contentHash}`);
-        console.log(`  Got:      ${calcHash}`);
-      }
-    } catch (error) {
-      handleCommandError(error);
-    }
-  });
+  .action(auditCommand);
 
 program
   .command('download-bundle')

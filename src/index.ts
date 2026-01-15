@@ -11,6 +11,7 @@ import { format, handleCommandError } from './utils/format.js';
 import { validateBytes32, validateBlockId, validateArtifactPath } from './utils/validation.js';
 import type { InitOptions, SubmitOptions, AuditOptions, DownloadOptions } from './types/index.js';
 import { hashCommand } from './commands/hash.js';
+import { initCommand } from './commands/init.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
 
@@ -126,29 +127,7 @@ program
   .description('Initialize a new YAMO block template')
   .argument('<agent_name>', 'Name of the agent')
   .option('-i, --intent <intent>', 'Agent intent', CONSTANTS.DEFAULT_INTENT)
-  .action((agent_name: string, options: InitOptions) => {
-    try {
-      const template = `
-agent: ${agent_name};
-intent: ${options.intent};
-context:
-  platform;yamo_v0.5;
-constraints:
-  - human_readable;true;
-priority: medium;
-output: result.json;
-meta: hypothesis;Initial hypothesis;
-meta: confidence;0.9;
-log: session_start;timestamp;${new Date().toISOString()};
-handoff: User;
-    `.trim();
-
-      fs.writeFileSync(CONSTANTS.DEFAULT_FILENAME, template);
-      format.success(`Created YAMO template: ${chalk.bold(CONSTANTS.DEFAULT_FILENAME)}`);
-    } catch (error) {
-      handleCommandError(error);
-    }
-  });
+  .action(initCommand);
 
 program
   .command('submit')

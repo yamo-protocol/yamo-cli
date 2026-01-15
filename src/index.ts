@@ -6,22 +6,11 @@ import fs from 'fs';
 import path from 'path';
 import * as dotenv from 'dotenv';
 import { IpfsManager, YamoChainClient } from '@yamo/core';
+import { CONSTANTS } from './utils/constants.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
 
 dotenv.config();
-
-// Constants
-const CONSTANTS = {
-  HASH_PATTERN: /^0x[a-fA-F0-9]{64}$/,
-  GENESIS_HASH: '0x0000000000000000000000000000000000000000000000000000000000000000',
-  DEFAULT_FILENAME: 'block.yamo',
-  DEFAULT_CONSENSUS: 'cli_manual',
-  DEFAULT_LEDGER: 'yamo_cli',
-  DEFAULT_INTENT: 'execute_task',
-  HEX_PREFIX: '0x',
-  HASH_ALGORITHM: 'sha256' as const,
-} as const;
 
 // TypeScript interfaces
 interface InitOptions {

@@ -7,34 +7,11 @@ import path from 'path';
 import * as dotenv from 'dotenv';
 import { IpfsManager, YamoChainClient } from '@yamo/core';
 import { CONSTANTS } from './utils/constants.js';
+import type { InitOptions, SubmitOptions, AuditOptions, DownloadOptions } from './types/index.js';
 
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../package.json'), 'utf8'));
 
 dotenv.config();
-
-// TypeScript interfaces
-interface InitOptions {
-  intent: string;
-}
-
-interface SubmitOptions {
-  id: string;
-  prev?: string;
-  consensus: string;
-  ledger: string;
-  ipfs: boolean;
-  encrypt: boolean;
-  key?: string;
-}
-
-interface AuditOptions {
-  key?: string;
-}
-
-interface DownloadOptions {
-  key?: string;
-  output: string;
-}
 
 const program = new Command();
 const ipfsManager = new IpfsManager();

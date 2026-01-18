@@ -9,7 +9,7 @@ import type { InitOptions } from '../types/index.js';
  * @param agentName - Name of the agent
  * @param options - Command options
  */
-export async function initCommand(agentName: string, options: InitOptions): Promise<void> {
+export function initCommand(agentName: string, options: InitOptions): void {
   try {
     const template = `
 agent: ${agentName};

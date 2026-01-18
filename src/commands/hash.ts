@@ -7,7 +7,7 @@ import { format, handleCommandError } from '../utils/format.js';
  * Calculate SHA256 hash of a file.
  * @param file - Path to file
  */
-export async function hashCommand(file: string): Promise<void> {
+export function hashCommand(file: string): void {
   try {
     if (!fs.existsSync(file)) {
       throw new Error(`File not found: ${file}`);

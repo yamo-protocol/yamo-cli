@@ -43,9 +43,10 @@ async function validateEncryptionKey(key: string): Promise<void> {
   const { validatePasswordStrength } = await import('@yamo/core');
   try {
     validatePasswordStrength(key);
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : 'Unknown validation error';
     format.error('Password validation failed:');
-    format.error(e.message);
+    format.error(errorMessage);
     format.warn('\nKey requirements:');
     console.error('  • Minimum 12 characters');
     console.error('  • Mix of uppercase, lowercase, numbers, symbols');

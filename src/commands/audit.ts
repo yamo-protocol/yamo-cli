@@ -24,9 +24,9 @@ export async function auditCommand(blockId: string, options: AuditOptions): Prom
     }
 
     format.detail('Found on-chain record:');
-    console.log(`  Agent: ${block.agentAddress}`);
-    console.log(`  Hash:  ${block.contentHash}`);
-    console.log(`  IPFS:  ${block.ipfsCID || 'None'}`);
+    console.log(`  Agent: ${String(block.agentAddress)}`);
+    console.log(`  Hash:  ${String(block.contentHash)}`);
+    console.log(`  IPFS:  ${String(block.ipfsCID || 'None')}`);
 
     if (!block.ipfsCID) {
       format.warn('⚠️  No IPFS CID. Cannot perform deep content audit.');
@@ -37,7 +37,7 @@ export async function auditCommand(blockId: string, options: AuditOptions): Prom
 
     const ipfsManager = new IpfsManager();
     const key = options.key || process.env.YAMO_ENCRYPTION_KEY;
-    const content = await ipfsManager.download(block.ipfsCID, key);
+    const content = await ipfsManager.download(String(block.ipfsCID), key);
 
     const hash = crypto.createHash(CONSTANTS.HASH_ALGORITHM).update(content).digest('hex');
     const calcHash = CONSTANTS.HEX_PREFIX + hash;
@@ -48,7 +48,7 @@ export async function auditCommand(blockId: string, options: AuditOptions): Prom
       format.success('✅ INTEGRITY VERIFIED: Content matches chain hash.');
     } else {
       format.error('❌ INTEGRITY FAILED: Hash mismatch!');
-      console.log(`  Expected: ${block.contentHash}`);
+      console.log(`  Expected: ${String(block.contentHash)}`);
       console.log(`  Got:      ${calcHash}`);
     }
   } catch (error) {

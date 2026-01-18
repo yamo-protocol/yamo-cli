@@ -13,10 +13,7 @@ dotenv.config();
  * @param cid - IPFS content identifier
  * @param options - Command options
  */
-export async function downloadBundleCommand(
-  cid: string,
-  options: DownloadOptions
-): Promise<void> {
+export async function downloadBundleCommand(cid: string, options: DownloadOptions): Promise<void> {
   try {
     format.info(`Downloading bundle ${cid}...`);
 
@@ -46,7 +43,7 @@ export async function downloadBundleCommand(
     // Write artifact files
     for (const [filename, content] of Object.entries(bundle.files)) {
       const filePath = path.join(outputDir, filename);
-      fs.writeFileSync(filePath, content as string);
+      fs.writeFileSync(filePath, content);
       format.success(`✓ Downloaded ${filename}`);
     }
 

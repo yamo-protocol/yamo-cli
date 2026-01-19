@@ -105,3 +105,26 @@ yamo submit task.yamo --ipfs --encrypt --key "my-secret"
 # Audit encrypted block
 yamo audit block_001 --key "my-secret"
 ```
+
+## 🧪 Testing
+
+Run all tests:
+```bash
+npm test
+```
+
+Run specific test suite:
+```bash
+npm test -- test/hash.test.js
+```
+
+**Test Coverage:**
+- Unit tests: 22 tests (hash, init, validation utilities, format utilities, constants)
+- Integration tests: 8 tests (CLI interface, error handling)
+- E2E tests: 2 tests (basic workflows)
+- Security tests: 13 tests (path traversal protection)
+- Validation tests: 3 tests (blockId format)
+- Auto-fetch tests: 5 tests (previousBlock resolution)
+- Health checks: 2 tests (test suite validation)
+
+**Total: 54+ tests** with 100% pass rate

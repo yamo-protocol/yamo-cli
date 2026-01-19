@@ -33,4 +33,5 @@ export function handleCommandError(error: unknown, context?: string): void {
   } else {
     format.error('Unknown error occurred');
   }
+  process.exit(1);
 }

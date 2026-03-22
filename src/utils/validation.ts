@@ -11,12 +11,13 @@ export function validateBytes32(hash: string): boolean {
 
 /**
  * Validates YAMO block ID format (origin_workflow).
+ * Enforces alphanumeric characters and a single underscore.
  * @param blockId - Block identifier to validate
  * @returns True if valid format
  */
 export function validateBlockId(blockId: string): boolean {
-  const parts = blockId.split('_');
-  return parts.length === 2 && parts.every((p) => p.length > 0);
+  const pattern = /^[a-z0-9]+_[a-z0-9]+$/i;
+  return pattern.test(blockId);
 }
 
 /**

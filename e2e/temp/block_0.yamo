@@ -1,0 +1,13 @@
+agent: SkillEcosystemOrchestrator;
+intent: orchestrate_superpowers_skill_ecosystem;
+context:
+  ecosystem_name;superpowers_skills;
+  total_skills;14;
+constraints:
+  - coordinate_all_14_skills;required;
+priority: critical;
+output: ecosystem_orchestration.json;
+log: skill_ecosystem_orchestration_initiated;timestamp;2025-12-31T00:00:00Z;
+meta: hypothesis;Orchestrated skill ecosystem enables systematic high-quality development;
+meta: confidence;0.98;
+handoff: SkillDiscoveryCoordinator;

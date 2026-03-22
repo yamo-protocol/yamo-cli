@@ -1,6 +1,6 @@
 {
   "name": "@yamo/cli",
-  "version": "1.3.13",
+  "version": "1.3.14",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -22,8 +22,8 @@
     "start": "node dist/index.js",
     "test": "node --test 'test/*.test.js' 'test/e2e/*.test.js'",
     "test:security": "node --test test/security.test.js",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts"
   },
@@ -45,6 +45,7 @@
   "homepage": "https://github.com/yamo-protocol/yamo-cli#readme",
   "devDependencies": {
     "@types/form-data": "^2.2.1",
+    "@types/inquirer": "^9.0.7",
     "@types/node": "^25.0.8",
     "@typescript-eslint/eslint-plugin": "^8.53.0",
     "@typescript-eslint/parser": "^8.53.0",
@@ -61,6 +62,8 @@
     "chalk": "^4.1.2",
     "commander": "^14.0.2",
     "dotenv": "^17.2.3",
-    "form-data": "^4.0.5"
+    "form-data": "^4.0.5",
+    "inquirer": "^9.2.12",
+    "ora": "^5.4.1"
   }
 }

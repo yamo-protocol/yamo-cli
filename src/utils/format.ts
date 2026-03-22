@@ -5,13 +5,13 @@ export const format = {
     console.log(chalk.green(msg));
   },
   error(msg: string): void {
-    console.error(chalk.red(`Error: ${msg}`));
+    console.error(chalk.red(`[ERROR] ${msg}`));
   },
   info(msg: string): void {
     console.log(chalk.blue(msg));
   },
   warn(msg: string): void {
-    console.log(chalk.yellow(msg));
+    console.error(chalk.yellow(`[WARN] ${msg}`));
   },
   detail(msg: string): void {
     console.log(chalk.gray(msg));

@@ -90,6 +90,44 @@ yamo audit block_001
 yamo audit block_001 --key "my-secret"
 ```
 
+### `yamo config <action> [key] [value]`
+Manage local configuration and secrets persistently. Actions: `set`, `get`, `list`, `remove`.
+Values are stored in `~/.yamo/config.json`. Sensitive keys (e.g., `PRIVATE_KEY`) are masked in `list`.
+
+```bash
+# Set a configuration value
+yamo config set PRIVATE_KEY 0x...
+
+# List current configuration
+yamo config list
+
+# Get a specific value
+yamo config get RPC_URL
+```
+
+### `yamo download-bundle <cid>`
+Downloads a complete YAMO bundle (file + artifacts) from IPFS.
+
+*   `-o, --output <path>`: Output directory path.
+*   `-k, --key <string>`: Decryption key if the bundle is encrypted.
+
+```bash
+yamo download-bundle Qm... -o ./downloads/my-bundle
+```
+
+### `yamo bridge <subcommand>`
+Interact with the YAMO bridge/cluster. Requires `YAMO_BRIDGE_URL` to be set.
+
+*   `kernels`: List connected kernels and their capabilities.
+*   `status`: Show bridge cluster status.
+*   `invoke <skill> --payload <json>`: Invoke a skill via the bridge.
+
+```bash
+yamo bridge status
+yamo bridge kernels
+yamo bridge invoke my-skill -p '{"input": "test"}'
+```
+
 ## 🔒 Encryption
 
 YAMO v1.0 supports optional client-side encryption for IPFS bundles.

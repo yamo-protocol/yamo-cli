@@ -1,14 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import * as dotenv from 'dotenv';
-import { YamoChainClient, IpfsManager } from '@yamo/core';
+import inquirer from 'inquirer';
+import { config, validateConfig } from '../utils/config.js';
 import { format, handleCommandError } from '../utils/format.js';
+import { createSpinner } from '../utils/spinner.js';
 import { validateBytes32, validateBlockId, validateArtifactPath } from '../utils/validation.js';
 import { CONSTANTS } from '../utils/constants.js';
 import type { SubmitOptions } from '../types/index.js';
-
-dotenv.config();
+import type { IChainClient, IIpfsClient } from '../interfaces.js';
 
 /**
  * Validate bytes32 hash format
@@ -86,7 +86,7 @@ function prepareIpfsFiles(content: string, file: string): Array<{ name: string; 
 /**
  * Resolve previous block hash
  */
-async function resolvePreviousBlock(chainClient: YamoChainClient, prev?: string): Promise<string> {
+async function resolvePreviousBlock(chainClient: IChainClient, prev?: string): Promise<string> {
   if (prev) {
     validateBytes32Hash(prev, 'previousBlock');
     return prev;
@@ -104,25 +104,64 @@ async function resolvePreviousBlock(chainClient: YamoChainClient, prev?: string)
   return CONSTANTS.GENESIS_HASH;
 }
 
+export interface SubmitDependencies {
+  chainClient: IChainClient;
+  ipfsClient: IIpfsClient;
+}
+
 /**
  * Submit a YAMO block to the blockchain.
  * @param file - Path to YAMO file
  * @param options - Command options
+ * @param deps - Injected dependencies (Chain and IPFS clients)
  */
-export async function submitCommand(file: string, options: SubmitOptions): Promise<void> {
+export async function submitCommand(
+  file: string, 
+  options: SubmitOptions, 
+  deps: SubmitDependencies
+): Promise<void> {
   try {
+    let blockId = options.id;
+
+    // Interactive fallback for blockId
+    if (!blockId && process.stdout.isTTY) {
+      const answers = await inquirer.prompt<{ blockId: string }>([
+        {
+          type: 'input',
+          name: 'blockId',
+          message: 'Enter Unique Block ID (format: {origin}_{workflow}):',
+          validate: (input: string): boolean | string => (validateBlockId(input) ? true : 'Invalid format. Use {origin}_{workflow}'),
+        },
+      ]);
+      blockId = answers.blockId;
+    }
+
+    if (!blockId) {
+      throw new Error('blockId is required. Provide it via --id or interactively.');
+    }
+
     // Validate inputs
-    validateBlockIdFormat(options.id);
+    validateBlockIdFormat(blockId);
 
     // Validate encryption key if needed
+    let encryptionKey: string | undefined;
     if (options.encrypt) {
-      const key = options.key || process.env.YAMO_ENCRYPTION_KEY;
-      if (!key) {
-        throw new Error(
-          'Encryption enabled but no key provided. Use --key or set YAMO_ENCRYPTION_KEY'
-        );
+      let key = options.key || config.encryptionKey;
+      
+      if (!key && process.stdout.isTTY) {
+        const answers = await inquirer.prompt<{ key: string }>([
+          {
+            type: 'password',
+            name: 'key',
+            message: 'Enter Encryption Key:',
+            mask: '*',
+          },
+        ]);
+        key = answers.key;
       }
-      await validateEncryptionKey(key);
+
+      encryptionKey = validateConfig.requireEncryptionKey(key);
+      await validateEncryptionKey(encryptionKey);
     }
 
     // Calculate content hash
@@ -134,34 +173,38 @@ export async function submitCommand(file: string, options: SubmitOptions): Promi
     // Handle IPFS upload
     let ipfsCID: string | undefined;
     if (options.ipfs) {
-      const ipfsManager = new IpfsManager();
-      const files = prepareIpfsFiles(content, file);
+      const spinner = createSpinner('Preparing and uploading to IPFS...');
+      try {
+        const files = prepareIpfsFiles(content, file);
 
-      const encryptionKey = options.encrypt
-        ? options.key || process.env.YAMO_ENCRYPTION_KEY
-        : undefined;
-
-      if (encryptionKey) {
-        format.warn('🔒 Encrypting bundle...');
+        ipfsCID = await deps.ipfsClient.upload({ content, files, encryptionKey });
+        spinner.succeed(`[DONE] Uploaded to IPFS`);
+        format.info(`IPFS Bundle CID: ${ipfsCID}`);
+      } catch (e) {
+        spinner.fail('[FAILED] IPFS upload failed');
+        throw e;
       }
-
-      ipfsCID = await ipfsManager.upload({ content, files, encryptionKey });
-      format.info(`IPFS Bundle CID: ${ipfsCID}`);
     }
 
     // Resolve previous block
-    const chainClient = new YamoChainClient();
-    const resolvedPreviousBlock = await resolvePreviousBlock(chainClient, options.prev);
+    const resolvedPreviousBlock = await resolvePreviousBlock(deps.chainClient, options.prev);
 
     // Submit to blockchain
-    await chainClient.submitBlock(
-      options.id,
-      resolvedPreviousBlock,
-      contentHash,
-      options.consensus,
-      options.ledger,
-      ipfsCID
-    );
+    const txSpinner = createSpinner(`Submitting Block ${blockId} to blockchain...`);
+    try {
+      await deps.chainClient.submitBlock(
+        blockId,
+        resolvedPreviousBlock,
+        contentHash,
+        options.consensus,
+        options.ledger,
+        ipfsCID
+      );
+      txSpinner.succeed(`[DONE] Block ${blockId} anchored to chain`);
+    } catch (e) {
+      txSpinner.fail('[FAILED] Blockchain submission failed');
+      throw e;
+    }
   } catch (error) {
     handleCommandError(error);
   }

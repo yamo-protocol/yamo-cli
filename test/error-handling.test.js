@@ -19,7 +19,7 @@ describe('Error Handling Tests', () => {
       assert.fail('Should have thrown error for missing --id');
     } catch (err) {
       const output = (err.stderr || err.stdout || '').toString();
-      assert.match(output, /required option.*--id/i, 'Should show missing option error');
+      assert.match(output, /blockId is required.*--id/i, 'Should show missing option error');
     }
   });
 

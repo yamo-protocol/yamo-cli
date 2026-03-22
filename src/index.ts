@@ -14,13 +14,11 @@ import { bridgeCommand } from './commands/bridge.js';
 import type { SubmitOptions, AuditOptions } from './types/index.js';
 
 const program = new Command();
-const chainClient = new YamoChainClient(config.rpcUrl, config.privateKey, config.contractAddress);
-const ipfsClient = new IpfsManager({ jwt: config.pinataJwt });
 
 program
   .name('yamo')
   .description('YAMO CLI - Blockchain-anchored agent workflow system')
-  .version('1.3.13');
+  .version('1.3.14');
 
 program
   .command('hash')
@@ -46,14 +44,22 @@ program
   .option('--ipfs', 'Upload content to IPFS', false)
   .option('-e, --encrypt', 'Encrypt bundle before IPFS upload', false)
   .option('-k, --key <key>', 'Encryption/decryption key')
-  .action((file: string, options: SubmitOptions) => submitCommand(file, options, { chainClient, ipfsClient }));
+  .action((file: string, options: SubmitOptions) => {
+    const chainClient = new YamoChainClient(config.rpcUrl, config.privateKey, config.contractAddress);
+    const ipfsClient = new IpfsManager({ jwt: config.pinataJwt });
+    return submitCommand(file, options, { chainClient, ipfsClient });
+  });
 
 program
   .command('audit')
   .description('Verify a block on the blockchain')
   .argument('<blockId>', 'Block ID to audit')
   .option('-k, --key <key>', 'Decryption key')
-  .action((blockId: string, options: AuditOptions) => auditCommand(blockId, options, { chainClient, ipfsClient }));
+  .action((blockId: string, options: AuditOptions) => {
+    const chainClient = new YamoChainClient(config.rpcUrl, config.privateKey, config.contractAddress);
+    const ipfsClient = new IpfsManager({ jwt: config.pinataJwt });
+    return auditCommand(blockId, options, { chainClient, ipfsClient });
+  });
 
 program
   .command('config')
